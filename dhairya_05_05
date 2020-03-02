@@ -1,0 +1,172 @@
+<?php
+
+
+ini_set("soap.wsdl_cache_enabled", 0);
+ini_set('max_execution_time', 0);
+ini_set('memory_limit',-1);
+
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+
+$link = mysqli_connect("127.0.0.1", "root", "passwd", "dbname");
+
+
+if($link === false){
+    die("ERROR: Could not connect. " . mysqli_connect_error());
+}
+
+
+
+$qry1 = "SELECT sample_id FROM sample where sample_id<=50000";
+$res1 = mysqli_query($link,$qry1);
+
+
+//$sample = mysqli_fetch_all($link,$res1); //array of data
+$sample = []; //initialise empty array
+while($row = $res1->fetch_assoc())
+{
+    $sample[] = $row;
+}
+
+
+$qry2 = "SELECT gene_id FROM gene";
+$res2 = mysqli_query($link,$qry2);
+
+//$gene = mysql_fetch_all($res2); //array of data
+$gene = []; //initialise empty array
+while($row = $res2->fetch_assoc())
+{
+    $gene[] = $row;
+}
+$values = expressionValue(); //Array of expression values
+
+create_table($sample,$gene,$values);
+
+
+function create_table($sample,$gene,$values)
+{
+
+                 $link = mysqli_connect("127.0.0.1", "root", "passwd", "dbname");
+
+                // Check connection
+                if($link === false){
+                        die("ERROR: Could not connect. " . mysqli_connect_error());
+                        }
+
+             $k = 0;
+
+
+          $inserts = [];
+          $batchSize = 23304; // Adjust to your resources
+
+         $sqlStart = '';
+
+        for($i = 0; $i < count($sample); $i++)
+        {
+                for ($j=0; $j < count($gene); $j++)
+                {
+
+                        $inserts[] =  "('".$sample[$i]['sample_id']."','".$gene[$j]['gene_id']."','".$values[$i][$j]."'),";
+                         echo count($inserts);
+
+                        if (count($inserts) == $batchSize)
+                        {
+                                 saveToDb($inserts);
+                                 $inserts = [];
+                        }
+
+                }
+
+         }
+        saveToDb($inserts);
+}
+
+function saveToDb(array $inserts)
+{
+     $link = mysqli_connect("127.0.0.1", "root", "passwd", "dbname");
+
+                // Check connection
+                if($link === false)
+                {
+                        die("ERROR: Could not connect. " . mysqli_connect_error());
+                }
+
+     if (empty($inserts))
+     {
+         return;
+     }
+     $q  = "INSERT INTO New(`sample_id`,`gene_id`,`value`)";
+                $q .= " VALUES ".implode($inserts)."";
+                $q = rtrim($q,',');
+               $sql = mysqli_query($link,$q);
+
+        if ( false===$sql)
+        {
+           echo("Error description: " . mysqli_error($link));
+        }
+        else
+        {
+             echo "Success";
+        }
+
+ }
+function expressionValue() //Function to fetch expression values
+{
+
+        //$values = "output.csv";
+        $values = "realData.csvaa";
+        $dir = "/home/mpgenData/chunkstest/";
+        $holder = "$dir$values";
+
+         $count=0;
+
+        if (($DataFile = fopen($holder,"r")) !== FALSE)
+        {
+           while (($DataFileRow = fgetcsv($DataFile, 0, "\t")) !== FALSE)
+           {
+
+                 $datavalue[]= arrayPrepared($DataFileRow);
+                 //$finalData = array_push($finalData,$datavalue);
+
+                $count++;
+                echo $count;
+                echo "no of samples<br />";
+
+            }//end of while
+
+        }//End of If
+  /*echo "<pre>";
+   print_r($datavalue);
+  echo "</pre>";*/
+echo $count;
+ return $datavalue;
+}//end of function
+
+function arrayPrepared($DataFileRow)
+{
+                    $count=0;
+                    foreach($DataFileRow as $value)
+                    {
+                                $datavalue[] = $value;
+                                $count++;
+                                echo $count;
+                                echo "no of genes<br />";
+                    }//end of FOR
+                   return $datavalue;
+
+}
+
+function check_dbconn($connection)
+{
+    if (!mysqli_ping($connection))
+    {
+        mysqli_close($connection);
+        $connection = mysqli_connect("127.0.0.1", "root", "passwd", "dbname");
+
+    }
+    return $connection;
+}
+
+?>
+
